@@ -1,0 +1,7 @@
+# ninja log v5
+0	9223	1575849163028134861	neighbor_query_cuda.o	dc48aa4c7eb5ff03
+0	12116	1575849165920121851	neighbor_query_cuda_kernel.cuda.o	585f8d015bcf6a9f
+12117	12190	1575849165996121509	neighbor_query_cuda.so	87df07861ebc69cb
+0	8977	1575855534901965427	neighbor_query_cuda.o	dc48aa4c7eb5ff03
+0	12293	1575855538213940819	neighbor_query_cuda_kernel.cuda.o	585f8d015bcf6a9f
+12294	12366	1575855538289940265	neighbor_query_cuda.so	87df07861ebc69cb
