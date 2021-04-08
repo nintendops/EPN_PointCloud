@@ -1,5 +1,5 @@
 from importlib import import_module
-from ZPConvNets import FragmentLoader, FragmentTestLoader, PointCloudPairSampler, Dataloader_3dmatch_eval
+from SPConvNets import FragmentLoader, FragmentTestLoader, PointCloudPairSampler, Dataloader_3dmatch_eval
 from tqdm import tqdm
 import torch
 import vgtk
@@ -7,8 +7,6 @@ import vgtk.pc as pctk
 import numpy as np
 import os
 import os.path as osp
-
-SEQUENTIAL_LOADER = False
 
 class Trainer(vgtk.Trainer):
     def __init__(self, opt):
@@ -24,17 +22,9 @@ class Trainer(vgtk.Trainer):
         self.iter_counter = 0
 
     def _setup_datasets(self):
-
-        load_in_sequence = SEQUENTIAL_LOADER or (self.opt.model.model == 'equiv_zpnet')
-        if load_in_sequence:
-            self.logger.log('Dataloader', 'Loading data in scene order!!!')
-
         if self.opt.mode == 'train':
-            # dataset = Dataloader_3dmatch(self.opt)
-
             dataset = FragmentLoader(self.opt, self.opt.model.search_radius, kptname=self.opt.dataset, \
                                      use_normals=self.opt.model.normals, npt=self.opt.npt)
-
             sampler = PointCloudPairSampler(len(dataset))
 
             self.dataset_train = torch.utils.data.DataLoader(dataset, \
@@ -44,20 +34,8 @@ class Trainer(vgtk.Trainer):
                                              num_workers=self.opt.num_thread)
             self.dataset_iter = iter(self.dataset_train)
 
-        if self.opt.mode in ['train','test']:
-            dataset_test = FragmentTestLoader(self.opt, \
-                                            '../Datasets/MScenes/evaluation/3DMatch', \
-                                            self.opt.model.search_radius, use_normals=self.opt.model.normals, npt=self.opt.npt)
-            self.dataset_test = torch.utils.data.DataLoader(dataset_test, \
-                                 batch_size=1, \
-                                 shuffle=False, \
-                                 num_workers=self.opt.num_thread)
-            # self.dataset_test_iter = iter(self.dataset_test)
-
         if self.opt.mode == 'eval':
             self.dataset_train = None
-            # self.dataset_test = Dataloader_3dmatch_test(self.opt, grouped=True)
-
 
     def _setup_eval_datasets(self, scene):
         dataset_eval = Dataloader_3dmatch_eval(self.opt, scene)
@@ -68,10 +46,10 @@ class Trainer(vgtk.Trainer):
 
     def _setup_model(self):
         param_outfile = osp.join(self.root_dir, "params.json")
-        module = import_module('ZPConvNets.models')
+        module = import_module('SPConvNets.models')
         self.model = getattr(module, self.opt.model.model).build_model_from(self.opt, param_outfile)
-        # flag for whether the model requires a input fragment (besides patches)
-        self.smooth_model = type(self.model) == import_module('ZPConvNets.models').inv_so3net_smooth.InvSO3ConvSmoothModel
+        # flag for whether the model requires an input fragment (besides patches)
+        self.smooth_model = type(self.model) == import_module('SPConvNets.models').inv_so3net_smooth.InvSO3ConvSmoothModel
 
 
     def _setup_metric(self):
@@ -96,14 +74,6 @@ class Trainer(vgtk.Trainer):
             self.dataset_iter = iter(self.dataset_train)
             data = next(self.dataset_iter)
         self._optimize(data)
-        # log_info = {
-        #         'Loss': 0,
-        #         'Pos': 0,
-        #         'Neg': 0,
-        #         'Acc': 0,
-        #     }
-
-        # self.summary.update(log_info)
 
     def _prepare_input(self, data):
         in_tensor_src = data['src'].to(self.opt.device)
@@ -111,22 +81,6 @@ class Trainer(vgtk.Trainer):
         nchannel = in_tensor_src.shape[-1]
         in_tensor_src = in_tensor_src.view(-1, self.opt.model.input_num, nchannel)
         in_tensor_tgt = in_tensor_tgt.view(-1, self.opt.model.input_num, nchannel)
-
-        # ----------------- DEBUG only -----------------------
-        # gtt = data['T'][0].numpy()
-
-        # data = in_tensor_src.cpu().numpy()
-        # data_tgt = in_tensor_tgt.cpu().numpy()
-        # data_tgt = data_tgt @ gtt.T
-
-        # print(gtt)
-        
-        # for i in range(data.shape[0]):
-        #     pctk.save_ply(osp.join('vis_gpu07', "train%d_src_patches.ply"%i), pctk.cent(data[i]))
-        #     pctk.save_ply(osp.join('vis_gpu07', "train%d_tgt_patches.ply"%i), pctk.cent(data_tgt[i]))
-
-        # import ipdb; ipdb.set_trace()
-        # ---------------------------------------------------
 
         if self.smooth_model:
             fragment_src = data['frag_src'].to(self.opt.device).squeeze()
@@ -143,15 +97,6 @@ class Trainer(vgtk.Trainer):
 
         in_tensor_src, in_tensor_tgt = self._prepare_input(data)
 
-        ####################################################
-        # gt_T = self.anchors[3][None]       
-        # in_tensor_src = torch.matmul(in_tensor_tgt, gt_T[0].T)
-        #######################################################
-        
-        # in_tensors = torch.cat((in_tensor_src, in_tensor_tgt), dim=0)
-        # ys, yw = self.model(in_tensors)
-        # y_src, y_tgt = torch.chunk(ys, 2, dim=0)
-        # yw_src, yw_tgt = torch.chunk(yw, 2, dim=0)
         y_src, yw_src = self.model(in_tensor_src)
         y_tgt, yw_tgt = self.model(in_tensor_tgt)
         
@@ -197,68 +142,13 @@ class Trainer(vgtk.Trainer):
         # self.summary.reset(['Loss', 'Pos', 'Neg', 'Acc', 'InvAcc'])
 
     def test(self):
-        self.logger.log('Testing','Evaluating test set!')
-        self.model.eval()
-        self.metric.eval()
-        with torch.no_grad():
-            all_acc = {}
-            for it, data in enumerate(self.dataset_test):                
-                in_tensor_src, in_tensor_tgt = self._prepare_input(data)
-                scene_id = data['id'][0].split('AT')[0]
-                if scene_id not in all_acc.keys():
-                    all_acc[scene_id] = list()
-                # in_tensors = torch.cat((in_tensor_src, in_tensor_tgt), dim=0)
-                # ys, yw = self.model(in_tensors)
-                # y_src, y_tgt = torch.chunk(ys, 2, dim=0)
-                # yw_src, yw_tgt = torch.chunk(yw, 2, dim=0)
-
-                y_src, yw_src = self.model(in_tensor_src)
-                y_tgt, yw_tgt = self.model(in_tensor_tgt)
-
-                # if self.opt.model.flag == 'attention':
-                #     self.loss, invloss, rloss, accuracy, pos_loss, neg_loss = self.metric(y_src, y_tgt, None, [yw_src, yw_tgt])
-                # else:
-
-                self.loss, accuracy, pos_loss, neg_loss = self.metric(y_src, y_tgt, None)
-
-                # Log training stats
-                if self.opt.train_loss.equi_alpha > 0:
-                    log_info = {
-                        'Loss': self.loss.item(),
-                        'InvLoss': self.loss.item(),
-                        'Pos': pos_loss.item(),
-                        'Neg': neg_loss.item(),
-                        'Acc': 100 * accuracy.item(),
-                        'EquiLoss': 0,
-                        'EquiPos': 0,
-                        'EquiNeg': 0,
-                        'EquiAcc': 0,
-                    }
-                else:
-                    log_info = {
-                        'Loss': self.loss.item(),
-                        'Pos': pos_loss.item(),
-                        'Neg': neg_loss.item(),
-                        'Acc': 100 * accuracy.item(),
-                    }
-
-
-                all_acc[scene_id].append(100 * accuracy.item())
-                self.logger.log('Testing', '\t'.join(f'{k}:{v:.4f}' for k,v in log_info.items()))
-
-
-            for scene in all_acc.keys():
-                scene_acc = np.array(all_acc[scene])
-                self.logger.log('Testing', "The mean accuracy for scene %s is only %.2f..."%(scene,np.mean(scene_acc)))
-
-        self.model.train()
-        self.metric.train()
+        pass
 
     def eval(self, select):
         '''
             3D Match evaluation. Only works for invariant setting
         '''
-        from ZPConvNets.datasets import evaluation_3dmatch as eval3dmatch
+        from SPConvNets.datasets import evaluation_3dmatch as eval3dmatch
 
         # set up where to store the output feature
         all_results = dict()
@@ -266,13 +156,6 @@ class Trainer(vgtk.Trainer):
             assert osp.isdir(osp.join(self.opt.dataset_path, scene))
             print(f"Working on scene {scene}...")
             target_folder = osp.join('data/evaluate/3DMatch/', self.opt.experiment_id, scene, f'{self.opt.model.output_num}_dim')
-
-        ###############################################
-            # if osp.isdir(target_folder):
-            #     print("Target folder already exists: %s"%target_folder)
-            #     print("Overwriting features...")
-            # self.dataset_test.prepare(scene)
-            ###########################################
 
             self._setup_eval_datasets(scene)
             self._generate(target_folder)
@@ -288,13 +171,9 @@ class Trainer(vgtk.Trainer):
         with torch.no_grad():
             self.model.eval()
             bs = self.opt.batch_size
-            # sid = self.dataset_test.current_sid
-            # print("\nWorking on fragment id", sid)
-            # feature_buffer = []
-            print("\n---------- Evaluating the network! ------------------")
-            # ctn = 0
 
-            ################### NEW EVAL LOADER ###############################3
+            print("\n---------- Evaluating the network! ------------------")
+
             from tqdm import tqdm
             for it, data in enumerate(self.dataset_eval):
                 sid = data['sid'].item()
@@ -329,38 +208,11 @@ class Trainer(vgtk.Trainer):
                 out_path = osp.join(target_folder, "feature%d.npy"%sid)
                 print(f"\nSaving features to {out_path}")
                 np.save(out_path, feature_out)
-            ######################################################################
 
-            ########################## DEPRECATED EVAL LOADER ###############################
-            # while self.dataset_test.next_batch():
-            #     in_tensor_test = torch.from_numpy(self.dataset_test.batch_data).float().to(self.opt.device)
-
-            #     ######################## DEBUG ##########################3
-            #     # patches_sample_path = 'vis/3dmatch_samples/eval'
-            #     # os.makedirs(patches_sample_path, exist_ok=True)
-            #     # for idx, pc in enumerate(self.dataset_test.batch_data):
-            #     #     pctk.save_ply(osp.join(patches_sample_path, 'test_patches%d.ply'%(ctn*8+idx)), pctk.cent(pc))
-            #     # ctn += 1
-            #     # import ipdb; ipdb.set_trace()
-            #     #########################################################
-
-            #     feature, _ = self.model(in_tensor_test)
-            #     feature_np = feature.detach().cpu().numpy()
-            #     feature_buffer.append(feature_np)
-            #     print("Batch counter at %d/%d"%(self.dataset_test.batch_pt, self.dataset_test.current_scene_length), end='\r')
-            #     if self.dataset_test.is_new_scene:
-            #         feature_out = np.vstack(feature_buffer)
-            #         print("\nSaving features with shape", feature_out.shape)
-            #         np.save(osp.join(target_folder, "feature%d.npy"%sid), feature_out)
-            #         feature_buffer = []
-            #         sid = self.dataset_test.current_sid
-            #         print("\nWorking on fragment id", sid)
-            # print("\n ------------------------------------------------")
-            ################################################################################S
 
     def _write_csv(self, results):
         import csv
-        from ZPConvNets.datasets import evaluation_3dmatch as eval3dmatch
+        from SPConvNets.datasets import evaluation_3dmatch as eval3dmatch
 
         csvpath = osp.join('data/evaluate/3DMatch/', self.opt.experiment_id, 'recall.csv')
         with open(csvpath, 'w', newline='') as csvfile:

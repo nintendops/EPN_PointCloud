@@ -1,6 +1,6 @@
-from ZPConvNets.trainer_modelnetRotation import Trainer as TrainerR
-from ZPConvNets.trainer_modelnet import Trainer 
-from ZPConvNets.options import opt
+from SPConvNets.trainer_modelnetRotation import Trainer as TrainerR
+from SPConvNets.trainer_modelnet import Trainer 
+from SPConvNets.options import opt
 
 opt.mode = 'eval'
 trainer = TrainerR(opt)

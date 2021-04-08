@@ -5,12 +5,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.batchnorm import _BatchNorm
-import time
 from collections import OrderedDict
 import json
 import vgtk
-import ZPConvNets.utils as M
-import vgtk.zpconv.functional as L
+import SPConvNets.utils as M
+import vgtk.spconv.functional as L
 
 class ClsSO3ConvModel(nn.Module):
     def __init__(self, params):
@@ -68,7 +67,7 @@ def build_model(opt,
         print("Using sampling_ratio:", sampling_ratio)
         print("Using strides:", strides)
 
-    params = {'name': 'Invariant ZPConv Model',
+    params = {'name': 'SPConv Classfication Model',
               'backbone': [],
               'na': na
               }
@@ -85,10 +84,9 @@ def build_model(opt,
 
     num_centers = [int(input_num / multiplier) for multiplier in stride_multipliers]
     radius_ratio = [initial_radius_ratio * multiplier**sampling_density for multiplier in stride_multipliers]
-    # radius_ratio = [0.25, 0.5]
     radii = [r * input_radius for r in radius_ratio]
+    
     # Compute sigma
-    # weighted_sigma = [sigma_ratio * radii[i]**2 * stride_multipliers[i] for i in range(n_layer + 1)]
     weighted_sigma = [sigma_ratio * radii[0]**2]
 
     for idx, s in enumerate(strides):
@@ -99,30 +97,18 @@ def build_model(opt,
         for j, dim_out in enumerate(block):
             lazy_sample = i != 0 or j != 0
             stride_conv = i == 0 or xyz_pooling != 'stride'
-            # TODO: WARNING: Neighbor here did not consider the actual nn for pooling. Hardcoded in vgtk for now.
             neighbor = int(sampling_ratio * num_centers[i] * radius_ratio[i]**(1/sampling_density))
-            # if i==0 and j==0:
-            #    neighbor *= int(input_num/1024)
             kernel_size = 1
             if j == 0:
                 # stride at first (if applicable), enforced at first layer
                 inter_stride = strides[i]
                 nidx = i if i == 0 else i+1
                 if stride_conv:
-                    neighbor *= 2 # = 2 * int(sampling_ratio * num_centers[i] * radius_ratio[i]**(1/sampling_density))
-                    # kernel_size = 1 # if inter_stride < 4 else 3
+                    neighbor *= 2 
             else:
                 inter_stride = 1
                 nidx = i+1
 
-            print(f"At block {i}, layer {j}!")
-            print(f'neighbor: {neighbor}')
-            print(f'stride: {inter_stride}')
-            sigma_to_print = weighted_sigma[nidx]**2 / 3
-            print(f'sigma: {sigma_to_print}')
-            print(f'radius ratio: {radius_ratio[nidx]}')
-
-            # import ipdb; ipdb.set_trace()
 
             # one-inter one-intra policy
             block_type = 'inter_block' if na<60 else 'separable_block'

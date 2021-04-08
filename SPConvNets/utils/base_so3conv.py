@@ -9,9 +9,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.batchnorm import _BatchNorm
 
-import vgtk.zpconv as zptk
+# import vgtk.zpconv as zptk
 import vgtk.so3conv as sptk
 # SO3 Conv
+
+# [nb, np, 3] -> [nb, 3, np] x [nb, 1, np, na]
+def preprocess_input(x, na, add_center=True):
+    has_normals = x.shape[2] == 6
+    # add a dummy center point at index zero
+    if add_center and not has_normals:
+        center = x.mean(1, keepdim=True)
+        x = torch.cat((center,x),dim=1)[:,:-1]
+    xyz = x[:,:,:3]
+    return sptk.SphericalPointCloud(xyz.permute(0,2,1).contiguous(), sptk.get_occupancy_features(x, na, add_center), None)
+
 
 # [b, c1, p, a] -> [b, c1, k, p, a] -> [b, c2, p, a]
 class IntraSO3ConvBlock(nn.Module):
@@ -43,7 +54,7 @@ class IntraSO3ConvBlock(nn.Module):
             feat = self.dropout(feat)
 
         # [b, 3, p] x [b, c2, p]
-        return zptk.SphericalPointCloud(x.xyz, feat, x.anchors)
+        return sptk.SphericalPointCloud(x.xyz, feat, x.anchors)
 
 
 class PropagationBlock(nn.Module):
@@ -66,7 +77,7 @@ class PropagationBlock(nn.Module):
             feat = self.relu(feat)
         if self.training and self.dropout is not None:
             feat = self.dropout(feat)
-        return zptk.SphericalPointCloud(x.xyz, feat, x.anchors)
+        return sptk.SphericalPointCloud(x.xyz, feat, x.anchors)
 
 # [b, c1, p1, a] -> [b, c1, k, p2, a] -> [b, c2, p2, a]
 class InterSO3ConvBlock(nn.Module):
@@ -103,7 +114,7 @@ class InterSO3ConvBlock(nn.Module):
 
         if self.training and self.dropout is not None:
             feat = self.dropout(feat)
-        return inter_idx, inter_w, sample_idx, zptk.SphericalPointCloud(x.xyz, feat, x.anchors)
+        return inter_idx, inter_w, sample_idx, sptk.SphericalPointCloud(x.xyz, feat, x.anchors)
 
 
 class BasicSO3ConvBlock(nn.Module):
@@ -183,10 +194,10 @@ class SeparableSO3ConvBlock(nn.Module):
         if self.use_intra:
             x = self.intra_conv(x)
         if self.stride > 1:
-            skip_feature = zptk.functional.batched_index_select(skip_feature, 2, sample_idx.long())
+            skip_feature = sptk.functional.batched_index_select(skip_feature, 2, sample_idx.long())
         skip_feature = self.skip_conv(skip_feature)
         skip_feature = self.relu(self.norm(skip_feature))
-        x_out = zptk.SphericalPointCloud(x.xyz, x.feats + skip_feature, x.anchors)
+        x_out = sptk.SphericalPointCloud(x.xyz, x.feats + skip_feature, x.anchors)
         return inter_idx, inter_w, sample_idx, x_out
 
     def get_anchor(self):
@@ -267,7 +278,7 @@ class ClsOutBlockR(nn.Module):
 
         # group convolution after mean pool
         if hasattr(self, 'intra'):
-            x_in = zptk.SphericalPointCloud(None, x_out, None)
+            x_in = sptk.SphericalPointCloud(None, x_out, None)
             for lid, conv in enumerate(self.intra):
                 skip_feat = x_in.feats
                 x_in = conv(x_in)
@@ -276,7 +287,7 @@ class ClsOutBlockR(nn.Module):
                 norm = self.norm[norm_cnt]
                 skip_feat = self.skipconv[lid](skip_feat)
                 skip_feat = F.relu(norm(skip_feat))
-                x_in = zptk.SphericalPointCloud(None, skip_feat + x_in.feats, None)
+                x_in = sptk.SphericalPointCloud(None, skip_feat + x_in.feats, None)
                 norm_cnt += 1
             x_out = x_in.feats
 
@@ -312,6 +323,7 @@ class ClsOutBlockR(nn.Module):
                 confidence = confidence.unsqueeze(1)
             x_out = x_out * confidence
             x_out = x_out.sum(-1)
+        ####################################################
         elif self.pooling_method.startswith('attention'):
             x_out = x_out.mean(2)
             out_feat = self.attention_layer(x_out)  # Bx1XA or BxCxA
@@ -323,11 +335,8 @@ class ClsOutBlockR(nn.Module):
 
         # fc layers
         for linear in self.fc1:
-            # norm = self.norm[norm_cnt]
             x_out = linear(x_out)
-            # x_out = F.relu(norm(x_out))
             x_out = F.relu(x_out)
-            # norm_cnt += 1
 
         x_out = self.fc2(x_out)
 
@@ -367,12 +376,6 @@ class ClsOutBlockPointnet(nn.Module):
             self.attention_layer = nn.Conv1d(c_in, 1, 1)
 
         # ------------------------------------------------
-
-        # self.fc1 = nn.ModuleList()
-        # for c in fc:
-        #     self.fc1.append(nn.Linear(c_in, c))
-        #     # self.norm.append(nn.BatchNorm1d(c))
-        #     c_in = c
         self.pointnet = sptk.PointnetSO3Conv(c_in, c_in, na)
         self.norm.append(nn.BatchNorm1d(c_in))
         self.fc2 = nn.Linear(c_in, self.outDim)
@@ -389,7 +392,7 @@ class ClsOutBlockPointnet(nn.Module):
             norm_cnt += 1
 
         out_feat = x_out
-        x_in = zptk.SphericalPointCloud(x.xyz, out_feat, x.anchors)
+        x_in = sptk.SphericalPointCloud(x.xyz, out_feat, x.anchors)
 
         x_out = self.pointnet(x_in)
 
@@ -425,10 +428,6 @@ class InvOutBlockR(nn.Module):
         c_in = params['dim_in']
         mlp = params['mlp']
 
-        # TODO
-        if 'intra' in params.keys():
-            pass
-
         if 'pooling' not in params.keys():
             self.pooling_method = 'max'
         else:
@@ -440,17 +439,14 @@ class InvOutBlockR(nn.Module):
         if self.pooling_method == 'attention':
             self.temperature = params['temperature']
             self.attention_layer = nn.Conv1d(mlp[-1], 1, 1)
-            # self.attention_layer = nn.Conv1d(c_in, 1, 1)
 
         # 1x1 Conv layer
         self.linear = nn.ModuleList()
         for c in mlp:
             self.linear.append(nn.Conv2d(c_in, c, 1))
-            # self.linear.append(nn.Linear(c_in, c))
             self.norm.append(nn.InstanceNorm2d(c, affine=False))
             c_in = c
 
-        # self.out_norm = nn.BatchNorm1d(c_in)
 
 
     def forward(self, feats):
@@ -484,9 +480,6 @@ class InvOutBlockR(nn.Module):
         else:
             raise NotImplementedError(f"Pooling mode {self.pooling_method} is not implemented!")
 
-        # batch norm in the last layer?
-        # x_out = self.out_norm(x_out)
-
         return F.normalize(x_out, p=2, dim=1), out_feat
 
 
@@ -512,10 +505,6 @@ class InvOutBlockPointnet(nn.Module):
             self.temperature = params['temperature']
             self.attention_layer = nn.Conv1d(c_out, 1, 1)
 
-
-        # self.out_norm = nn.BatchNorm1d(c_out, affine=True)
-
-
     def forward(self, x):
         # nb, nc, np, na -> nb, nc, na
         x_out = self.pointnet(x)
@@ -536,8 +525,6 @@ class InvOutBlockPointnet(nn.Module):
         else:
             raise NotImplementedError(f"Pooling mode {self.pooling_method} is not implemented!")
 
-        # batch norm in the last layer?
-        # x_out = self.out_norm(x_out)
         return F.normalize(x_out, p=2, dim=1), F.normalize(out_feat, p=2, dim=1)
 
 class InvOutBlockMVD(nn.Module):
@@ -562,9 +549,6 @@ class InvOutBlockMVD(nn.Module):
 
         self.pointnet = sptk.PointnetSO3Conv(c_in,c_out,na)
 
-        # self.out_norm = nn.BatchNorm1d(c_out, affine=True)
-
-
     def forward(self, x):
         # nb, nc, np, na -> nb, nc, na
 
@@ -576,7 +560,7 @@ class InvOutBlockMVD(nn.Module):
 
         # nb, nc, np, 1
         x_out = (x.feats * attn).sum(-1, keepdim=True)
-        x_in = zptk.SphericalPointCloud(x.xyz, x_out, None)
+        x_in = sptk.SphericalPointCloud(x.xyz, x_out, None)
 
         # nb, nc
         x_out = self.pointnet(x_in).view(nb, -1)
@@ -591,12 +575,8 @@ class SO3OutBlockR(nn.Module):
 
         c_in = params['dim_in']
         mlp = params['mlp']
-        # fc = params['fc']
-        # k = params['k']
-        # self.outDim = k
 
         self.linear = nn.ModuleList()
-        # self.norm = nn.ModuleList()
         self.temperature = params['temperature']
         self.representation = params['representation']
         self.attention_layer = nn.Conv2d(mlp[-1], 1, (1,1))
@@ -665,8 +645,8 @@ class RelSO3OutBlockR(nn.Module):
 
     def forward(self, f1, f2, x1, x2):
         # nb, nc, np, na -> nb, nc, na
-        sp1 = zptk.SphericalPointCloud(x1, f1, None)
-        sp2 = zptk.SphericalPointCloud(x2, f2, None)
+        sp1 = sptk.SphericalPointCloud(x1, f1, None)
+        sp2 = sptk.SphericalPointCloud(x2, f2, None)
 
         f1 = self._pooling(sp1)
         f2 = self._pooling(sp2)
@@ -697,6 +677,4 @@ class RelSO3OutBlockR(nn.Module):
         # [nb, nc, na]
         x_out = self.pointnet(x)
         x_out = F.relu(x_out)
-
         return x_out
-        # return feats.mean(2)

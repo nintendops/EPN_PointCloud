@@ -9,8 +9,8 @@ import time
 from collections import OrderedDict
 import json
 import vgtk
-import ZPConvNets.utils as M
-import vgtk.zpconv.functional as L
+import SPConvNets.utils as M
+import vgtk.spconv.functional as L
 
 
 class RegSO3ConvModel(nn.Module):
@@ -79,7 +79,7 @@ def build_model(opt,
         print("Using sampling_ratio:", sampling_ratio)
         print("Using strides:", strides)
 
-    params = {'name': 'Invariant ZPConv Model',
+    params = {'name': 'SPConv Regression Model',
               'backbone': [],
               'na': na
               }

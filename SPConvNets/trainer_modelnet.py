@@ -2,8 +2,8 @@ from importlib import import_module
 from SPConvNets import Dataloader_ModelNet40
 from tqdm import tqdm
 import torch
-import vgtk.vgtk as vgtk
-import vgtk.vgtk.pc as pctk
+import vgtk
+import vgtk.pc as pctk
 import numpy as np
 import os
 import torch.nn.functional as F
@@ -45,13 +45,12 @@ class Trainer(vgtk.Trainer):
         else:
             param_outfile = None
 
-        module = import_module('ZPConvNets.models')
+        module = import_module('SPConvNets.models')
         self.model = getattr(module, self.opt.model.model).build_model_from(self.opt, param_outfile)
 
     def _setup_metric(self):
         if self.attention_model:
             self.metric = vgtk.AttentionCrossEntropyLoss(self.opt.train_loss.attention_loss_type, self.opt.train_loss.attention_margin)
-            # self.r_metric = AnchorMatchingLoss()
         else:
             self.metric = vgtk.CrossEntropyLoss()
 
@@ -129,8 +128,6 @@ class Trainer(vgtk.Trainer):
 
         with torch.no_grad():
             accs = []
-            # lmc = np.zeros([40,60], dtype=np.int32)
-
             all_labels = []
             all_feats = []
 
@@ -170,6 +167,7 @@ class Trainer(vgtk.Trainer):
             best_acc = np.array(self.test_accs).max()
             self.logger.log('Testing', 'Best accuracy so far is %.2f!!!!'%(best_acc))
 
+            # enable lines below for testing retrieval mAP
             # n = 1
             # mAP = modelnet_retrieval_mAP(all_feats,all_labels,n)
             # self.logger.log('Testing', 'Mean average precision at %d is %f!!!!'%(n, mAP))

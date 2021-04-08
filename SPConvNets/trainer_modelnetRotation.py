@@ -1,5 +1,5 @@
 from importlib import import_module
-from ZPConvNets import Dataloader_ModelNet40, Dataloader_ModelNet40Alignment
+from SPConvNets import Dataloader_ModelNet40, Dataloader_ModelNet40Alignment
 from tqdm import tqdm
 import torch
 import vgtk
@@ -49,7 +49,7 @@ class Trainer(vgtk.Trainer):
         else:
             param_outfile = None
 
-        module = import_module('ZPConvNets.models')
+        module = import_module('SPConvNets.models')
         self.model = getattr(module, self.opt.model.model).build_model_from(self.opt, param_outfile)
 
     def _setup_metric(self):
@@ -94,16 +94,6 @@ class Trainer(vgtk.Trainer):
         in_rot_label = data['R_label'].to(self.opt.device).view(nb,-1)
         in_alignment = data['T'].to(self.opt.device).float()
         in_R = data['R'].to(self.opt.device).float()
-
-        #########################################
-        # pc1 = pctk.cent(in_tensors[0]).cpu().numpy()
-        # pc2 = pctk.cent(in_tensors[8]).cpu().numpy()
-        # alignment = data['T'][0].numpy()
-        # pc2_T = pc2 @ alignment.T
-        # pctk.save_ply('vis/pc1.ply', pc1)
-        # pctk.save_ply('vis/pc2.ply', pc2_T, c='r')
-        # import ipdb; ipdb.set_trace()
-        ###########################################
 
         preds, y = self.model(in_tensors)
         self.optimizer.zero_grad()
@@ -168,9 +158,7 @@ class Trainer(vgtk.Trainer):
             if self.exp_name is not None:
                 save_path = os.path.join('data','alignment_errors', f'{self.exp_name}_error.txt')
                 np.savetxt(save_path,all_error)
-            # import ipdb; ipdb.set_trace()
 
-            # self.logger.log('Testing', 'Best accuracy so far is %.2f!!!!'%(best_acc))
 
         self.model.train()
         self.metric.train()

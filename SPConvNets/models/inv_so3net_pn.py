@@ -5,12 +5,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.batchnorm import _BatchNorm
-import time
 from collections import OrderedDict
 import json
 import vgtk
-import ZPConvNets.utils as M
-import vgtk.zpconv.functional as L
+import SPConvNets.utils as M
+import vgtk.spconv.functional as L
 
 class InvSO3ConvModel(nn.Module):
     def __init__(self, params):
@@ -39,19 +38,6 @@ class InvSO3ConvModel(nn.Module):
     def get_anchor(self):
         return self.backbone[-1].get_anchor()
 
-# Full Version
-# def build_model(opt,
-#                 mlps=[[32,32], [64,64], [128,128]],
-#                 out_mlps=[128, 32],
-#                 strides=[2, 2, 2],
-#                 initial_radius_ratio = 0.2,
-#                 sampling_ratio = 0.8, #0.4, 0.36
-#                 sampling_density = 0.5,
-#                 kernel_density = 1,
-#                 kernel_multiplier = 2,
-#                 sigma_ratio= 1e-3, # 0.1
-#                 xyz_pooling = None,
-#                 to_file=None):
 def build_model(opt,
                 mlps=[[32,32], [64,64], [128,128], [128,128]],
                 out_mlps=[128, 64],
@@ -83,7 +69,7 @@ def build_model(opt,
         print("Using strides:", strides)
 
     print("[MODEL] USING RADIUS AT %f"%input_radius)
-    params = {'name': 'Invariant ZPConv Model',
+    params = {'name': 'Invariant SPConv Model',
               'backbone': [],
               'na': na
               }
@@ -103,9 +89,6 @@ def build_model(opt,
 
     # radius_ratio = [0.25, 0.5]
     radii = [r * input_radius for r in radius_ratio]
-
-    # Compute sigma
-    # weighted_sigma = [sigma_ratio * radii[i]**2 * stride_multipliers[i] for i in range(n_layer + 1)]
 
     weighted_sigma = [sigma_ratio * radii[0]**2]
     for idx, s in enumerate(strides):
@@ -132,20 +115,10 @@ def build_model(opt,
                 # nidx = i if (i == 0 or xyz_pooling != 'stride') else i+1
                 if stride_conv:
                     neighbor *= 2 # * int(sampling_ratio * num_centers[i] * radius_ratio[i]**(1/sampling_density))
-                    # neighbor = int(sampling_ratio * num_centers[i] * radius_ratio[i+1]**(1/sampling_density))
                     kernel_size = 1 # if inter_stride < 4 else 3
             else:
                 inter_stride = 1
                 nidx = i+1
-
-            print(f"At block {i}, layer {j}!")
-            print(f'neighbor: {neighbor}')
-            print(f'stride: {inter_stride}')
-
-            sigma_to_print = weighted_sigma[nidx]**2 / 3
-            print(f'sigma: {sigma_to_print}')
-            print(f'radius ratio: {radius_ratio[nidx]}')
-            # import ipdb; ipdb.set_trace()
 
             # one-inter one-intra policy
             block_type = 'inter_block' if na != 60  else 'separable_block'
@@ -170,17 +143,6 @@ def build_model(opt,
             }
             block_param.append(inter_param)
 
-            # intra_param = {
-            #     'type': 'intra_block',
-            #     'args': {
-            #         'dim_in': dim_out,
-            #         'dim_out': dim_out,
-            #         'dropout_rate': dropout_rate,
-            #         'activation': 'leaky_relu',
-            #     }
-            # }
-            # block_param.append(intra_param)
-
             dim_in = dim_out
 
         params['backbone'].append(block_param)
@@ -192,7 +154,6 @@ def build_model(opt,
         'temperature': temperature,
         'kanchor': na,
     }
-
 
     if to_file is not None:
         with open(to_file, 'w') as outfile:
