@@ -1,5 +1,5 @@
-from ZPConvNets.trainer_3dmatch import Trainer
-import ZPConvNets.datasets.evaluation_3dmatch as eval3dmatch
+from SPConvNets.trainer_3dmatch import Trainer
+import SPConvNets.datasets.evaluation_3dmatch as eval3dmatch
 import os.path as osp
 
 SCENE_TO_TEST = [    
@@ -15,32 +15,13 @@ SCENE_TO_TEST = [
             ]
 
 def our():
-  from ZPConvNets.options import opt
+  from SPConvNets.options import opt
   opt.mode = 'eval'
   assert opt.resume_path is not None
   opt.experiment_id = opt.resume_path.split('/')[2]
   trainer = Trainer(opt)
   trainer.eval(SCENE_TO_TEST)
   
-def our_test():
-  from ZPConvNets.options import opt
-  opt.mode = 'test'
-  assert opt.resume_path is not None
-  opt.experiment_id = opt.resume_path.split('/')[2]
-  trainer = Trainer(opt)
-  trainer.test()
-
-def others(dataset_path, target_folder):
-    '''
-        3D Match evaluation. Only works for invariant setting
-    '''
-    # set up where to store the output feature
-    scene_name = osp.basename(dataset_path)
-    eval3dmatch.evaluate_scene(dataset_path, target_folder, scene_name, suffix="lmvd")
-
 
 if __name__ == '__main__':
-  import fire
-  # fire.Fire()
   our()
-  # our_test()

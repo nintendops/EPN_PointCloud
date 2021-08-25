@@ -17,7 +17,7 @@ exp_args.add_argument('--model-dir', type=str, default='data/models',
 exp_args.add_argument('-s', '--seed', type=int, default=2913,
                       help='random seed')
 exp_args.add_argument('--run-mode', type=str, default='train',
-                      help='train | test | eval')
+                      help='train | eval | test')
 
 # Network arguments
 net_args = parser.add_parser("model")
@@ -86,15 +86,15 @@ loss_args = parser.add_parser("train_loss")
 loss_args.add_argument('--loss-type', type=str, default='soft',
                        help='type of loss function')
 loss_args.add_argument('--attention-loss-type', type=str, default='no_reg',
-                       help='type of attention loss function: default | schedule | no_reg ')
+                       help='type of attention loss function')
 loss_args.add_argument('--margin', type=float, default=1.0,
                        help='margin of hard batch loss')
 loss_args.add_argument('--temperature', type=float, default=3,
-                       help='attention temperature')
+                       help='margin of hard batch loss')
 loss_args.add_argument('--attention-margin', type=float, default=1.0,
                        help='margin of attention loss')
-loss_args.add_argument('--attention-pretrain-step', type=int, default=2000,
-                       help='step for scheduled pretrain (only used when attention type is schedule')
+loss_args.add_argument('--attention-pretrain-step', type=int, default=3000,
+                       help='step for scheduled pretrain (only used in attention model)')
 loss_args.add_argument('--equi-alpha', type=float, default=0.0,
                        help='weight for equivariance loss')
 # Eval arguments
@@ -103,6 +103,7 @@ eval_args = parser.add_parser("eval")
 # Test arguments
 test_args = parser.add_parser("test")
 
-
 opt = parser.parse_args()
+
+
 opt.mode = opt.run_mode
