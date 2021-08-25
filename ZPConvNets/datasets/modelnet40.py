@@ -35,6 +35,7 @@ class Dataloader_ModelNet40(data.Dataset):
         for cat in cats:
             for fn in glob.glob(os.path.join(opt.dataset_path, cat, self.mode, "*.mat")):
                 self.all_data.append(fn)
+
         print("[Dataloader] : Training dataset size:", len(self.all_data))
 
         if self.opt.no_augmentation:

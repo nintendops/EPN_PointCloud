@@ -1,9 +1,9 @@
 from importlib import import_module
-from SPConvNets import Dataloader_ModelNet40
+from ZPConvNets import Dataloader_ModelNet40
 from tqdm import tqdm
 import torch
-import vgtk.vgtk as vgtk
-import vgtk.vgtk.pc as pctk
+import vgtk
+import vgtk.pc as pctk
 import numpy as np
 import os
 import torch.nn.functional as F
@@ -35,7 +35,7 @@ class Trainer(vgtk.Trainer):
         dataset_test = Dataloader_ModelNet40(self.opt, 'testR')
         self.dataset_test = torch.utils.data.DataLoader(dataset_test, \
                                                         batch_size=self.opt.batch_size, \
-                                                        shuffle=True, \
+                                                        shuffle=False, \
                                                         num_workers=self.opt.num_thread)
 
 
@@ -81,8 +81,21 @@ class Trainer(vgtk.Trainer):
         bdim = in_tensors.shape[0]
         in_label = data['label'].to(self.opt.device).reshape(-1)
         in_Rlabel = data['R_label'].to(self.opt.device) if self.opt.debug_mode == 'knownatt' else None
+        # import ipdb; ipdb.set_trace()
+
+        ###################### ----------- debug only ---------------------
+        # in_tensorsR = data['pcR'].to(self.opt.device)
+        # import ipdb; ipdb.set_trace()
+        ##################### --------------------------------------------
 
         pred, feat = self.model(in_tensors, in_Rlabel)
+
+        ##############################################
+        # predR, featR = self.model(in_tensorsR, in_Rlabel)
+        # print(torch.sort(featR[0,0])[0])
+        # print(torch.sort(feat[0,0])[0])
+        # import ipdb; ipdb.set_trace()
+        ##############################################
 
         self.optimizer.zero_grad()
 
@@ -127,6 +140,18 @@ class Trainer(vgtk.Trainer):
         self.model.eval()
         self.metric.eval()
 
+        ################## DEBUG ###############################
+        # for module in self.model.modules():
+        #     if isinstance(module, torch.nn.modules.BatchNorm1d):
+        #         module.train()
+        #     if isinstance(module, torch.nn.modules.BatchNorm2d):
+        #         module.train()
+        #     if isinstance(module, torch.nn.modules.BatchNorm3d):
+        #         module.train()
+            # if isinstance(module, torch.nn.Dropout):
+            #     module.train()
+        #####################################################
+
         with torch.no_grad():
             accs = []
             # lmc = np.zeros([40,60], dtype=np.int32)
@@ -151,6 +176,10 @@ class Trainer(vgtk.Trainer):
                         acc = r_acc
                         loss = r_loss
 
+                    # max_id = attention.max(-1)[1].detach().cpu().numpy()
+                    # labels = data['label'].cpu().numpy().reshape(-1)
+                    # for i in range(max_id.shape[0]):
+                    #     lmc[labels[i], max_id[i]] += 1
                 else:
                     cls_loss, acc = self.metric(pred, in_label)
                     loss = cls_loss
@@ -170,9 +199,13 @@ class Trainer(vgtk.Trainer):
             best_acc = np.array(self.test_accs).max()
             self.logger.log('Testing', 'Best accuracy so far is %.2f!!!!'%(best_acc))
 
+            # self.logger.log("Testing", 'Here to peek at the lmc')
+            # self.logger.log("Testing", str(lmc))
+            # import ipdb; ipdb.set_trace()
             # n = 1
             # mAP = modelnet_retrieval_mAP(all_feats,all_labels,n)
             # self.logger.log('Testing', 'Mean average precision at %d is %f!!!!'%(n, mAP))
 
         self.model.train()
         self.metric.train()
+

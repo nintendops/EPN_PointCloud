@@ -20,11 +20,12 @@ class IntraSO3ConvBlock(nn.Module):
 
         super(IntraSO3ConvBlock, self).__init__()
 
-        if norm is None:
-            norm = nn.InstanceNorm2d
+        if norm is not None:
+            norm = getattr(nn,norm)
+            # norm = nn.InstanceNorm2d
 
         self.conv = sptk.IntraSO3Conv(dim_in, dim_out)
-        self.norm = norm(dim_out, affine=False)
+        self.norm = nn.InstanceNorm2d(dim_out, affine=False) if norm is None else norm(dim__out)
 
         if activation is None:
             self.relu = None
@@ -77,14 +78,19 @@ class InterSO3ConvBlock(nn.Module):
 
         if lazy_sample is None:
             lazy_sample = True
-        if norm is None:
-            norm = nn.InstanceNorm2d #nn.BatchNorm2d
+
+        if norm is not None:
+            norm = getattr(nn,norm)
+            
+        # if norm is None:
+        #     norm = nn.InstanceNorm2d #nn.BatchNorm2d
 
         pooling_method = None if pooling == 'none' else pooling
         self.conv = sptk.InterSO3Conv(dim_in, dim_out, kernel_size, stride,
                                       radius, sigma, n_neighbor, kanchor=kanchor,
                                       lazy_sample=lazy_sample, pooling=pooling_method)
-        self.norm = norm(dim_out, affine=False)
+        self.norm = nn.InstanceNorm2d(dim_out, affine=False) if norm is None else norm(dim_out)
+
         if activation is None:
             self.relu = None
         else:
@@ -93,14 +99,13 @@ class InterSO3ConvBlock(nn.Module):
         self.dropout = nn.Dropout(dropout_rate) if dropout_rate > 0 else None
 
     def forward(self, x, inter_idx=None, inter_w=None):
+        input_x = x
         inter_idx, inter_w, sample_idx, x = self.conv(x, inter_idx, inter_w)
-        # import ipdb; ipdb.set_trace()
         feat = self.norm(x.feats)
+        # feat = x.feats
 
         if self.relu is not None:
             feat = self.relu(feat)
-        ## TODO no need to add self.training
-
         if self.training and self.dropout is not None:
             feat = self.dropout(feat)
         return inter_idx, inter_w, sample_idx, zptk.SphericalPointCloud(x.xyz, feat, x.anchors)
@@ -151,7 +156,8 @@ class SeparableSO3ConvBlock(nn.Module):
 
         dim_in = params['dim_in']
         dim_out = params['dim_out']
-
+        norm = getattr(nn,params['norm']) if 'norm' in params.keys() else None
+        
         self.use_intra = params['kanchor'] > 1
 
         self.inter_conv = InterSO3ConvBlock(**params)
@@ -169,7 +175,7 @@ class SeparableSO3ConvBlock(nn.Module):
 
         # 1x1 conv for skip connection
         self.skip_conv = nn.Conv2d(dim_in, dim_out, 1)
-        self.norm = nn.InstanceNorm2d(dim_out, affine=False)
+        self.norm = nn.InstanceNorm2d(dim_out, affine=False) if norm is None else norm(dim_out)
         self.relu = getattr(F, params['activation'])
 
 
@@ -186,6 +192,7 @@ class SeparableSO3ConvBlock(nn.Module):
             skip_feature = zptk.functional.batched_index_select(skip_feature, 2, sample_idx.long())
         skip_feature = self.skip_conv(skip_feature)
         skip_feature = self.relu(self.norm(skip_feature))
+        # skip_feature = self.relu(skip_feature)
         x_out = zptk.SphericalPointCloud(x.xyz, x.feats + skip_feature, x.anchors)
         return inter_idx, inter_w, sample_idx, x_out
 
@@ -334,7 +341,7 @@ class ClsOutBlockR(nn.Module):
         return x_out, out_feat.squeeze()
 
 class ClsOutBlockPointnet(nn.Module):
-    def __init__(self, params, norm=None):
+    def __init__(self, params, norm=None, debug=False):
         super(ClsOutBlockPointnet, self).__init__()
 
         c_in = params['dim_in']
@@ -377,15 +384,21 @@ class ClsOutBlockPointnet(nn.Module):
         self.norm.append(nn.BatchNorm1d(c_in))
         self.fc2 = nn.Linear(c_in, self.outDim)
 
-
+        self.debug = debug
+        
     def forward(self, x, label=None):
         x_out = x.feats
+
+        if self.debug:
+            return x_out[:,:40].mean(-1).mean(-1),None
+        
         norm_cnt = 0
         end = len(self.linear)
         for lid, linear in enumerate(self.linear):
             norm = self.norm[norm_cnt]
             x_out = linear(x_out)
             x_out = F.relu(norm(x_out))
+            # x_out = F.relu(x_out)
             norm_cnt += 1
 
         out_feat = x_out
@@ -396,7 +409,8 @@ class ClsOutBlockPointnet(nn.Module):
         norm = self.norm[norm_cnt]
         norm_cnt += 1
         x_out = F.relu(norm(x_out))
-
+        # x_out = F.relu(x_out)
+        
         # mean pooling
         if self.pooling_method == 'mean':
             x_out = x_out.mean(dim=2)

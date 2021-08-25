@@ -3,5 +3,5 @@ from ZPConvNets.trainer_modelnet import Trainer
 from ZPConvNets.options import opt
 
 opt.mode = 'eval'
-trainer = TrainerR(opt)
+trainer = Trainer(opt)
 trainer.eval()
