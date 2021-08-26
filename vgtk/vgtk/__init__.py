@@ -4,7 +4,7 @@ from . import point3d
 # from . import mesh
 from . import pc
 # from . import voxel
-from . import zpconv
+from . import spconv
 from . import so3conv
 
 from .app import *

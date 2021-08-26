@@ -15,7 +15,7 @@ import vgtk.cuda.zpconv as cuda_zpconv
 import vgtk.cuda.gathering as gather
 import vgtk.cuda.grouping as cuda_nn
 
-import vgtk.zpconv as zpconv
+import vgtk.spconv as zpconv
 
 
 inter_so3conv_feat_grouping = zpconv.inter_zpconv_grouping_naive

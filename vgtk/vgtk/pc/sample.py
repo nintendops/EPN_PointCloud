@@ -4,7 +4,6 @@ import torch
 
 import vgtk.cuda.grouping as cuda_nn
 import vgtk.utils as utils
-# from vgtk.zpconv import add_shadow_point
 
 '''
 This file contains operators on point cloud that
