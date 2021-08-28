@@ -7,7 +7,7 @@ if __name__ == '__main__':
 
     if opt.mode == 'train':
         # overriding training parameters here
-        opt.batch_size = 2
+        opt.batch_size = 12
         opt.decay_rate = 0.5
         opt.decay_step = 20000
         opt.train_loss.attention_loss_type = 'default'

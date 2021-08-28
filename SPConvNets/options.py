@@ -8,11 +8,11 @@ parser = vgtk.HierarchyArgmentParser()
 exp_args = parser.add_parser("experiment")
 exp_args.add_argument('--experiment-id', type=str, default='playground',
                       help='experiment id')
-exp_args.add_argument('-d', '--dataset-path', type=str, default='data/train/7-scenes-redkitchen',
+exp_args.add_argument('-d', '--dataset-path', type=str, required=True,
                       help='path to datasets')
 exp_args.add_argument('--dataset', type=str, default='kpts',
                       help='name of the datasets')
-exp_args.add_argument('--model-dir', type=str, default='data/models',
+exp_args.add_argument('--model-dir', type=str, default='trained_models/models',
                       help='path to models')
 exp_args.add_argument('-s', '--seed', type=int, default=2913,
                       help='random seed')
@@ -50,7 +50,7 @@ train_args.add_argument('-e', '--num-epochs', type=int, default=None,
                         help='maximum number of training epochs')
 train_args.add_argument('-i', '--num-iterations', type=int, default=1000000,
                         help='maximum number of training iterations')
-train_args.add_argument('-b', '--batch-size', type=int, default=2,
+train_args.add_argument('-b', '--batch-size', type=int, default=8,
                         help='batch size to train')
 train_args.add_argument('--npt', type=int, default=24,
                         help='number of point per fragment')

@@ -49,7 +49,12 @@ class Dataloader_ModelNet40(data.Dataset):
 
     def __getitem__(self, index):
         data = sio.loadmat(self.all_data[index])
-        _, pc = pctk.uniform_resample_np(data['pc'], self.opt.model.input_num)
+    
+        if self.mode == 'train':
+            pc = pctk.uniform_resample_np(data['pc'], self.opt.model.input_num)
+        else:
+            pc = data['pc']
+    
         pc = p3dtk.normalize_np(pc.T)
         pc = pc.T
 
@@ -57,23 +62,10 @@ class Dataloader_ModelNet40(data.Dataset):
         R_label = 29
 
         if not self.opt.no_augmentation:
-
-            # ###################### HACK #########################
-            # ridx = np.random.randint(0, high=self.anchors.shape[0])
-            # R = self.anchors[ridx]
-            # pcR, _ = pctk.rotate_point_cloud(pc, R)
-            #######################################################
-
             if 'R' in data.keys() and self.mode != 'train':
                 pc, R = pctk.rotate_point_cloud(pc, data['R'])
             else:
                 pc, R = pctk.rotate_point_cloud(pc)
-
-            # if self.mode == 'test':
-            #     data['R'] = R
-            #     output_path = os.path.join(self.dataset_path, data['cat'][0], 'testR')
-            #     os.makedirs(output_path,exist_ok=True)
-            #     sio.savemat(os.path.join(output_path, data['name'][0] + '.mat'), data)
 
             _, R_label, R0 = rotation_distance_np(R, self.anchors)
 
