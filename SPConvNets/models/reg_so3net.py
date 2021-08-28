@@ -160,13 +160,6 @@ def build_model(opt,
 
         params['backbone'].append(block_param)
 
-        # params['outblock'] = {
-        #     'dim_in': dim_in,
-        #     'mlp': out_mlps,
-        #     'temperature': temperature,
-        #     'representation': representation,
-        # }
-
         params['outblock'] = {
                 'dim_in': dim_in,
                 'mlp': out_mlps,

@@ -123,8 +123,6 @@ def build_model(opt,
             print(f'sigma: {sigma_to_print}')
             print(f'radius ratio: {radius_ratio[nidx]}')
 
-            # import ipdb; ipdb.set_trace()
-
             # one-inter one-intra policy
             block_type = 'inter_block' if na<60 else 'separable_block'
             conv_param = {

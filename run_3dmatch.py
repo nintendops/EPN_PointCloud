@@ -15,10 +15,11 @@ SCENE_TO_TEST = [
 def config_opt_3dmatch(opt):
     opt.model.search_radius = 0.4
     opt.model.flag = 'attention'
+    opt.model.model = "inv_so3net_pn"
     opt.no_augmentation = True
 
     if opt.mode == 'train':
-        opt.npt = 16
+        opt.npt = 2
         opt.batch_size = 1
         opt.num_iterations = 150000
         opt.save_freq = 4000

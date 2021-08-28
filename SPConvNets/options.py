@@ -21,7 +21,7 @@ exp_args.add_argument('--run-mode', type=str, default='train',
 
 # Network arguments
 net_args = parser.add_parser("model")
-net_args.add_argument('-m', '--model', type=str, default='inv_so3net',
+net_args.add_argument('-m', '--model', type=str, default='inv_so3net_pn',
                       help='type of model to use')
 net_args.add_argument('--input-num', type=int, default=1024,
                       help='the number of the input points')

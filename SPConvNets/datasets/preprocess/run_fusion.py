@@ -88,14 +88,6 @@ def run_RGBDFusion(output_root, root_path, cfg):
                     print("Processing %d:%d/%d at scene %s..."%(head,tail,len(cpaths), scene_name))
                     pc, pose = FusionFromRGBD(frame_paths[head:tail], intrinsic, cfg)
 
-                    # ------ debug only ----------------------
-                    # points = np.asarray(pc.points)[::10]
-                    # points = to_hom_np(points.T).T @ pose.T
-                    # points = points[:,:3]
-                    # save_ply(os.path.join(output_dir, 'aligned_cloud_bin_%d.ply'%frag_counter), points)
-                    # print("Successfully written fused and aligned point cloud #%d for scene %s"%(frag_counter, scene_name))
-                    # ---------------------------------------- 
-
                     np.savetxt(os.path.join(output_dir,'cloud_bin_%d_pose.txt'%frag_counter), pose)
                     if o3d.io.write_point_cloud(os.path.join(output_dir, 'cloud_bin_%d.ply'%frag_counter), pc):
                         print("Successfully written fused point cloud #%d for scene %s"%(frag_counter, scene_name))
@@ -108,10 +100,12 @@ def run_RGBDFusion(output_root, root_path, cfg):
     return None
 
 if __name__ == '__main__':
-    root_path = r'/home/ICT2000/chenh/Haiwei/Datasets/MScenes/train/group1'
-    fuse_root = os.path.join(r'/home/ICT2000/chenh/Haiwei/Datasets/MScenes/train/fused_scenes')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data-path', type=str, required=True)
+    parser.add_argument('--output-path', type=str, required=True)
+    args = parser.parse_args()
     cfg = Config()
-
+    fuse_root = os.path.join(args.output_path, 'fused_fragments')
     # fusion
-    run_RGBDFusion(fuse_root, root_path, cfg)
+    run_RGBDFusion(fuse_root, args.data_path, cfg)
     print("Done!!!")

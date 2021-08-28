@@ -106,11 +106,6 @@ Kptmeta = namedtuple('Kptmeta','indices, id, pathA, pathB, poseA, poseB')
 
 def radius_ball_search_o3d(pcd, kpt, search_radius, voxel_size=0.015, return_normals=False, input_num=None, name=None):
     # radius-ball search
-    # if return_normals:
-    #     pcd.estimate_normals()
-    #     all_normals = []
-    # else:
-    #     all_normals = None
 
     normals_at_kpt = None
     from_o3d = lambda pcd: np.asarray(pcd.points)
@@ -211,7 +206,6 @@ def radius_ball_search_o3d_radii(pc, kpt_indices, radii, search_radius, input_nu
             all_pc.append(subsampled)
     return all_pc
 
-DEFAULT_ROOT = "../Datasets/MScenes/train"
 import random
 class PointCloudPairSampler(data.Sampler):
 
@@ -235,22 +229,20 @@ class PointCloudPairSampler(data.Sampler):
         random.shuffle(iter_indices)
         return iter_indices
 
+
 class FragmentLoader(data.Dataset):
-    def __init__(self, opt, search_radius, npt=24, kptname='kpts', use_normals=False, dynamic_radii=False):
+    def __init__(self, opt, search_radius, npt=24, kptname='kpts', use_normals=False):
         super(FragmentLoader, self).__init__()
         self.opt = opt
         self.data_path = os.path.join(opt.dataset_path, 'fused_fragments')
 
         self.use_normals = use_normals
-        self.use_radii = dynamic_radii
 
         scene_selection = None
         # scene_selection = ['sun3d-mit_lab_hj-lab_hj_tea_nov_2_2012_scan1_erika']
 
         if kptname != 'kpts':
             print('[Dataloader] Using keypoint folder at %s!!!'%os.path.join(opt.dataset_path, kptname))
-        if dynamic_radii:
-            print('[Dataloader] Extracting patches based on computed radii!')
         if use_normals:
             print('[Dataloader] Normals are used to transform the input points!')
         if not self.opt.no_augmentation:
@@ -260,9 +252,7 @@ class FragmentLoader(data.Dataset):
         keypoint_method = np.load
         keypoint_prefix = 'npy'
         parse_string = 'cloud_bin_{:d}-cloud_bin_{:d}.npy'
-        # self.keypoint_path = os.path.join(opt.dataset_path, keypoint_folder)
-        self.keypoint_path = os.path.join(DEFAULT_ROOT, keypoint_folder)
-
+        self.keypoint_path = os.path.join(opt.dataset_path, keypoint_folder)
         self.search_radius = search_radius
         self.input_num = opt.model.input_num
         self.voxel_size = 0.03 if self.input_num < 1024 else 0.015
@@ -270,20 +260,37 @@ class FragmentLoader(data.Dataset):
         self.npt = npt
         # get all the paths
         get_fragment_path = lambda scene,seq,idx: os.path.join(self.data_path, scene,seq, 'cloud_bin_%d.ply'%idx)
-        get_fragment_pose = lambda scene,seq,idx: np.load(os.path.join(self.data_path, scene,seq, 'cloud_bin_%d.pose.npy'%idx))
+        def get_fragment_pose(secene, seq, idx):
+            path1 = os.path.join(self.data_path, scene,seq, 'cloud_bin_%d.pose.npy'%idx)
+            path2 = os.path.join(self.data_path, scene,seq, 'cloud_bin_%d_pose.txt'%idx)
+            if os.path.exists(path1):
+                return np.load(path1)
+            else:
+                return np.loadtxt(path2)
+        # get_fragment_pose = lambda scene,seq,idx: np.load(os.path.join(self.data_path, scene,seq, 'cloud_bin_%d.pose.npy'%idx))
         self.kptfiles = []
         for scene in os.listdir(self.keypoint_path):
             if scene_selection is None or scene in scene_selection:
                 seq_paths = [sq for sq in glob.glob(os.path.join(self.keypoint_path, scene,"seq*")) \
                              if os.path.isdir(sq)]
-                for seq_path in seq_paths:
-                    seq = os.path.basename(seq_path)
+                if len(seq_paths) == 0:
+                    seq_path = os.path.join(self.keypoint_path, scene)
+                    seq = ""
                     for kptf in glob.glob(os.path.join(seq_path,"*.%s"%keypoint_prefix)):
                         idx1, idx2 = parse(parse_string, os.path.basename(kptf))
                         meta = Kptmeta(keypoint_method(kptf), f"{scene}_{seq}_{idx1}_{idx2}", \
                                        get_fragment_path(scene,seq,idx1), get_fragment_path(scene,seq,idx2),\
                                        get_fragment_pose(scene,seq,idx1), get_fragment_pose(scene,seq,idx2))
                         self.kptfiles.append(meta)
+                else:
+                    for seq_path in seq_paths:
+                        seq = os.path.basename(seq_path)
+                        for kptf in glob.glob(os.path.join(seq_path,"*.%s"%keypoint_prefix)):
+                            idx1, idx2 = parse(parse_string, os.path.basename(kptf))
+                            meta = Kptmeta(keypoint_method(kptf), f"{scene}_{seq}_{idx1}_{idx2}", \
+                                           get_fragment_path(scene,seq,idx1), get_fragment_path(scene,seq,idx2),\
+                                           get_fragment_pose(scene,seq,idx1), get_fragment_pose(scene,seq,idx2))
+                            self.kptfiles.append(meta)
 
         print('[Dataloader] Training set length:', len(self.kptfiles))
 
@@ -300,11 +307,6 @@ class FragmentLoader(data.Dataset):
         rawA, pcdA_down, normalA = radius_ball_search_o3d(pcdA, kpts[:,0], self.search_radius, self.voxel_size, self.use_normals)
         rawB, pcdB_down, normalB = radius_ball_search_o3d(pcdB, kpts[:,1], self.search_radius, self.voxel_size, self.use_normals)
 
-        ################################33
-        # pcdA = pcdA_down
-        # pcdB = pcdB_down
-        #####################################
-
         pcdA = np.asarray(pcdA.points).astype(np.float32)
         pcdB = np.asarray(pcdB.points).astype(np.float32)
 
@@ -315,23 +317,14 @@ class FragmentLoader(data.Dataset):
         # preprocessing and augmentation
         T = RigidMatrix(meta.poseA).R.T @ RigidMatrix(meta.poseB).R
 
-        # T = T.R
-        # T = np.identity(4)
-
         self.R_aug_src = None
-        self.R_aug_tgt = None
+        self.R_aug_tgt = None        
         if not self.opt.no_augmentation:
             _, self.R_aug_src = pctk.rotate_point_cloud(None, max_degree=30)
             _, self.R_aug_tgt = pctk.rotate_point_cloud(None, max_degree=30)
             _, pcdA = pctk.rotate_point_cloud(pcdA, self.R_aug_src)
             _, pcdB = pctk.rotate_point_cloud(pcdB, self.R_aug_tgt)
-            # T = ?
 
-        # if self.use_normals:
-        #     for pca,pcb,na,nb in zip(rawA, rawB, normalA, normalB):
-        #         inputA.append(self._preprocess(pca,self.R_aug_src,na))
-        #         inputB.append(self._preprocess(pcb,self.R_aug_tgt,nb))
-        # else:
         for pca, pcb in zip(rawA, rawB):
             inputA.append(self._preprocess(pca, self.R_aug_src))
             inputB.append(self._preprocess(pcb, self.R_aug_tgt))
@@ -360,19 +353,13 @@ class FragmentLoader(data.Dataset):
             pc = np.concatenate([pc,n],axis=1)
         return pc
 
-# for debug only
-# TEMP_TEST_FRAGMENT_PATH = "../Datasets/MScenes/evaluation/3DMatchNormals"
-
 class FragmentTestLoader(data.Dataset):
-    def __init__(self, opt, test_path, search_radius, use_normals=False, npt=24, dynamic_radii=False):
+    def __init__(self, opt, test_path, search_radius, use_normals=False, npt=24):
         super(FragmentTestLoader, self).__init__()
         self.opt = opt
         self.data_path = test_path
-        self.use_radii = dynamic_radii
         self.use_normals = use_normals
 
-        if dynamic_radii:
-            print('[Dataloader] Extracting patches based on computed radii!')
         if not self.opt.no_augmentation:
             print('[Dataloader] Using rotational augmentation!!')
 
@@ -385,7 +372,6 @@ class FragmentTestLoader(data.Dataset):
         self.npt = npt
         # get all the paths
         get_fragment_path = lambda scene,idx: os.path.join(self.data_path, scene, 'cloud_bin_%d.ply'%idx)
-        # get_fragment_path = lambda scene,idx: os.path.join(TEMP_TEST_FRAGMENT_PATH, scene, 'seq-01', 'cloud_bin_%d.ply'%idx)
         self.kptfiles = list()
 
         N_split_base = 2
@@ -417,14 +403,9 @@ class FragmentTestLoader(data.Dataset):
         kpts = meta.indices[:self.npt].astype(np.int32)
         pcdA = o3d.io.read_point_cloud(meta.pathA)
         pcdB = o3d.io.read_point_cloud(meta.pathB)
-        if self.use_radii:
-            radiiA = np.load(meta.pathA[:-4] + '.radius.npy')
-            radiiB = np.load(meta.pathB[:-4] + '.radius.npy')
-            rawA = radius_ball_search_o3d_radii(pcdA, kpts[:,0], radiiA, self.search_radius)
-            rawB = radius_ball_search_o3d_radii(pcdB, kpts[:,1], radiiB, self.search_radius)
-        else:
-            rawA, pcdA_down, normalA = radius_ball_search_o3d(pcdA, kpts[:,0], self.search_radius, self.voxel_size, self.use_normals)
-            rawB, pcdB_down, normalB = radius_ball_search_o3d(pcdB, kpts[:,1], self.search_radius, self.voxel_size, self.use_normals)
+
+        rawA, pcdA_down, normalA = radius_ball_search_o3d(pcdA, kpts[:,0], self.search_radius, self.voxel_size, self.use_normals)
+        rawB, pcdB_down, normalB = radius_ball_search_o3d(pcdB, kpts[:,1], self.search_radius, self.voxel_size, self.use_normals)
 
         # [nptxNx3(6)]
         inputA = []

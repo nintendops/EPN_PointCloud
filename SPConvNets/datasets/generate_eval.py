@@ -20,13 +20,11 @@ ALLSCENES = [ # 'kitchen',
              ]
 
 
-RADIUS = 0.52
-
 class Config():
-    def __init__(self):
+    def __init__(self, datapath, radius):
         model = namedtuple('model', ['input_num','search_radius'])
-        self.model = model(2048, RADIUS)
-        self.dataset_path = '../Datasets/MScenes/evaluation/3DMatch'
+        self.model = model(2048, radius)
+        self.dataset_path = datapath
         self.batch_size = 8
 
 def radius_ball_search_np_radii(pc, kpt_indices, radii, search_radius, input_num=None, msg=None):
@@ -56,46 +54,17 @@ def radius_ball_search_np_radii(pc, kpt_indices, radii, search_radius, input_num
 
     return all_pc
 
-# temp generator function for dataset with precomputed point density (radius)
-def precompute_patches_radii(data_path, search_radius, num_worker=8):
-    # outpkptsfilesut: # fragments x 5000 x nn x 3 npy files
-    ball_search = radius_ball_search_o3d_radii #radius_ball_search_np_radii
-    kptsfiles = glob.glob(join(data_path, 'seq-01', "*.keypts.npy"))
-    save_dir = os.path.join(data_path, 'grouped_data_r%.2f'%search_radius)
-    os.makedirs(save_dir, exist_ok=True)
-    mp_args = []
-    sid_list = []
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data-path', type=str, required=True)
+    parser.add_argument('--search-radius', type=float, default=0.4)
+    args = parser.parse_args()
+    opt = Config(args.data_path, args.search_radius)
 
-    for kid, kptf in enumerate(kptsfiles):
-        kpts = np.load(kptf).astype(np.int32)
-        radii = np.load(kptf.split('.keypts.')[0] + '.radius.npy')
-        ply_path = kptf.split('.keypts.')[0] + '.ply'
+    for scene in ALLSCENES:
+        print(f"Working on scene {scene}!")
+        dataset = SceneTestLoader(opt)
+        dataset.prepare(scene)
+        dataset.precompute_patches(scale=1.0, input_num=2048, num_worker=1)
 
-        # scene_pcd = pctk.load_ply(ply_path)
-        scene_pcd = o3d.io.read_point_cloud(ply_path)
-        mp_args.append([scene_pcd,kpts,radii,search_radius,2048,'At %s'%os.path.basename(ply_path)])
-        sid_list.append(os.path.basename(ply_path)[:-4])
-    if num_worker > 1:
-        pool = Pool(num_worker)
-        rsts = pool.starmap(ball_search, mp_args)
-        for rst,sid,arg in zip(rsts,sid_list,mp_args):
-            # n_keypoints x knn x3
-            grouped_points = np.array(rst)
-            save_path = os.path.join(save_dir, 'grouped_%s.npz'%sid)
-            np.savez(save_path, grouped_points)
-    else:
-        # non parallel method
-        for sid,arg in zip(sid_list,mp_args):
-            rst = ball_search(*arg)
-            grouped_points = np.array(rst)
-            save_path = os.path.join(save_dir, 'grouped_%s.npz'%sid)
-            np.savez(save_path, grouped_points)
-
-for scene in ALLSCENES:
-    print(f"Working on scene {scene}!")
-    opt = Config()
-    dataset = SceneTestLoader(opt)
-    dataset.prepare(scene)
-    dataset.precompute_patches(scale=1.0, input_num=2048, num_worker=1)
-
-print("Done!")
+    print("Done!")

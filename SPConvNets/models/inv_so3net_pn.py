@@ -40,18 +40,6 @@ class InvSO3ConvModel(nn.Module):
         return self.backbone[-1].get_anchor()
 
 # Full Version
-# def build_model(opt,
-#                 mlps=[[32,32], [64,64], [128,128]],
-#                 out_mlps=[128, 32],
-#                 strides=[2, 2, 2],
-#                 initial_radius_ratio = 0.2,
-#                 sampling_ratio = 0.8, #0.4, 0.36
-#                 sampling_density = 0.5,
-#                 kernel_density = 1,
-#                 kernel_multiplier = 2,
-#                 sigma_ratio= 1e-3, # 0.1
-#                 xyz_pooling = None,
-#                 to_file=None):
 def build_model(opt,
                 mlps=[[32,32], [64,64], [128,128], [128,128]],
                 out_mlps=[128, 64],
@@ -150,7 +138,7 @@ def build_model(opt,
             # one-inter one-intra policy
             block_type = 'inter_block' if na != 60  else 'separable_block'
 
-            inter_param = {
+            conv_param = {
                 'type': block_type,
                 'args': {
                     'dim_in': dim_in,
@@ -168,18 +156,7 @@ def build_model(opt,
                     'kanchor': na,
                 }
             }
-            block_param.append(inter_param)
-
-            # intra_param = {
-            #     'type': 'intra_block',
-            #     'args': {
-            #         'dim_in': dim_out,
-            #         'dim_out': dim_out,
-            #         'dropout_rate': dropout_rate,
-            #         'activation': 'leaky_relu',
-            #     }
-            # }
-            # block_param.append(intra_param)
+            block_param.append(conv_param)
 
             dim_in = dim_out
 
