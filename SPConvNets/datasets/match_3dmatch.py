@@ -452,10 +452,8 @@ class SceneEvalLoader(data.Dataset):
         self.readkptf = lambda idx: \
                         np.loadtxt(os.path.join(self.data_path,'01_Keypoints',\
                         f'cloud_bin_{idx}Keypoints.txt')).astype(np.int32)
-
         self.readfrag = lambda idx: \
-                        o3d.io.read_point_cloud(os.path.join(TEMP_TEST_FRAGMENT_PATH, scene, 'seq-01', \
-                        f'cloud_bin_{idx}.ply'))
+                        o3d.io.read_point_cloud(os.path.join(self.data_path, f'cloud_bin_{idx}.ply'))
         self.grouped_path = lambda idx: \
                         os.path.join(self.data_path, 'grouped_data_r%.2f'%self.search_radius,\
                         f'grouped_cloud_bin_{idx}.npz')

@@ -51,7 +51,7 @@ class Dataloader_ModelNet40(data.Dataset):
         data = sio.loadmat(self.all_data[index])
     
         if self.mode == 'train':
-            pc = pctk.uniform_resample_np(data['pc'], self.opt.model.input_num)
+            _, pc = pctk.uniform_resample_np(data['pc'], self.opt.model.input_num)
         else:
             pc = data['pc']
     

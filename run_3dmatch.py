@@ -19,11 +19,11 @@ def config_opt_3dmatch(opt):
     opt.no_augmentation = True
 
     if opt.mode == 'train':
-        opt.npt = 2
+        opt.npt = 16
         opt.batch_size = 1
         opt.num_iterations = 150000
         opt.save_freq = 4000
-        opt.decay_step = 20000
+        opt.train_lr.decay_step = 20000
     elif opt.mode == 'eval':
         opt.npt = 24
         opt.batch_size = 8
@@ -32,9 +32,9 @@ def config_opt_3dmatch(opt):
 
 if __name__ == '__main__':
     opt_3dmatch = config_opt_3dmatch(opt_3dmatch)
-    trainer = Trainer(opt_3dmatch)
     
     if opt_3dmatch.mode == 'train':    
+        trainer = Trainer(opt_3dmatch)
         trainer.train()
     elif opt_3dmatch.mode == 'eval':
         assert opt_3dmatch.resume_path is not None
