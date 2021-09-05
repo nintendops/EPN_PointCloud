@@ -205,8 +205,9 @@ class Trainer(vgtk.Trainer):
     def _write_csv(self, results):
         import csv
         from SPConvNets.datasets import evaluation_3dmatch as eval3dmatch
-
-        csvpath = osp.join('trained_models/evaluate/3DMatch/', self.opt.experiment_id, 'recall.csv')
+        csvpath_root = osp.join('trained_models/evaluate/3DMatch/', self.opt.experiment_id)
+        os.makedirs(csvpath_root, exist_ok=True)
+        csvpath = osp.join( csvpath_root, 'recall.csv')
         with open(csvpath, 'w', newline='') as csvfile:
             fieldnames = ['Scene'] + ['tau_%.2f'%tau for tau in eval3dmatch.TAU_RANGE]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
