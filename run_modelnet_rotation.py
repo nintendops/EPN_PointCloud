@@ -2,8 +2,8 @@ from SPConvNets.trainer_modelnetRotation import Trainer
 from SPConvNets.options import opt
 
 if __name__ == '__main__':
-	opt.model.flag = 'rotation'
-	opt.model.model = 'reg_so3net'
+    opt.model.flag = 'rotation'
+    opt.model.model = 'reg_so3net'
 
     if opt.mode == 'train':
         # overriding training parameters here
@@ -13,7 +13,7 @@ if __name__ == '__main__':
         opt.dropout_rate = 0.0
         opt.train_loss.attention_loss_type = 'default'
 
-	trainer = Trainer(opt)
+    trainer = Trainer(opt)
 
     if opt.mode == 'train':
         trainer.train()
