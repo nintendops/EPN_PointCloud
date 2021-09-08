@@ -49,7 +49,7 @@ class Trainer(vgtk.Trainer):
         else:
             param_outfile = None
 
-        module = import_module('ZPConvNets.models')
+        module = import_module('SPConvNets.models')
         self.model = getattr(module, self.opt.model.model).build_model_from(self.opt, param_outfile)
 
     def _setup_metric(self):
