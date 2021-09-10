@@ -9,9 +9,18 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 PACKAGE_NAME = 'vgtk'
 EXT_MODULES = ['gathering', 'grouping', 'zpconv']
 PACKAGES = ['app', 'cuda', 'functional', 'point3d', 'pc', 'mesh', 'voxel', 'spconv', 'so3conv', 'transform', 'data.anchors']
-INSTALL_REQUIREMENTS = ['numpy', 'torch', 'torchvision', 
-                        'scikit-image', 'tqdm', 'imageio', 'plyfile',
-                        'parse', 'colour']
+INSTALL_REQUIREMENTS = ['numpy',
+                        'torch',
+                        'torchvision', 
+                        'scikit-image==0.18.3',
+                        'scikit-learn==0.20.1',
+                        'open3d==0.9.0.0',
+                        'trimesh==3.2.0',
+                        'tqdm',
+                        'imageio',
+                        'plyfile',
+                        'parse',
+                        'colour']
 
 
 #############################################################
