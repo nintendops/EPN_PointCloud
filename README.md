@@ -21,7 +21,7 @@ EPN is a SE(3)-equivariant network model that is designed for deep point cloud a
 
 ## Usage
 
-The code has been tested on Python3.7, PyTorch ? and CUDA (10.1). The module and additional dependencies can be installed with 
+The code has been tested on Python3.7, PyTorch 1.7.1 and CUDA (10.1). The module and additional dependencies can be installed with 
 ```
 cd vgtk
 python setup.py install
