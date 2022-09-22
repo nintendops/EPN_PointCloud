@@ -187,7 +187,7 @@ class Trainer(vgtk.Trainer):
                 all_labels.append(in_label.cpu().numpy())
                 all_feats.append(feat.cpu().numpy())
 
-                accs.append(acc)
+                accs.append(acc.item())
                 self.logger.log("Testing", "Accuracy: %.1f, Loss: %.2f!"%(100*acc.item(), loss.item()))
                 if self.attention_model:
                     self.logger.log("Testing", "Rot Acc: %.1f, Rot Loss: %.2f!"%(100*r_acc.item(), r_loss.item()))
