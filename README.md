@@ -9,11 +9,11 @@ This repository contains the code (in PyTorch) for [Equivariant Point Network fo
 1. [Introduction](#introduction)
 2. [Usage](#usage)
 3. [Experiments](#experiments)
-4. [Contacts](#contacts)
+4. [Contact](#contact)
 
 ## Introduction
 
-EPN is a SE(3)-equivariant network model that is designed for deep point cloud analysis. The core of the architecture is the **SE(3) Separable Convolution** that combines two sequential, equivariant convolution layers to approximate convolution in the SE(3) space. With the incorporation of an attention mechanism, the EPN network model can bes used to extract both SE(3) equivariant features and selectively pooled invariant features for various feature learning tasks.
+EPN is a SE(3)-equivariant network model that is designed for deep point cloud analysis. The core of the architecture is the **SE(3) Separable Convolution** that combines two sequential, equivariant convolution layers to approximate convolution in the SE(3) space. With the incorporation of an attention mechanism, the EPN network model can be used to extract both SE(3) equivariant features and selectively pooled invariant features for various feature learning tasks.
 
 ![](https://github.com/nintendops/EPN_PointCloud/blob/main/media/spconv.png)
 
