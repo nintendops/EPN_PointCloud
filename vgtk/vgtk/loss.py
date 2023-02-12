@@ -168,7 +168,7 @@ class MultiTaskDetectionLoss(torch.nn.Module):
             # import ipdb; ipdb.set_trace()
             ####################################################
 
-            # how the fuck do you average rotations? closed form under chordal l2 mean
+            # averaging closed form under chordal l2 mean
             pred_R = so3_mean(pred_Rs, confidence)
 
             # option 1: l2 loss for the prediction at each "tight" anchor pair
